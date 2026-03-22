@@ -21,7 +21,7 @@ def validate_query(query: str) -> bool:
     return True
 
 def execute_gql(query: str):
-    # Placeholder for GQL execution logic
+    
     mock_db = [
         {"id": "S1", "organism": "E.coli", "country": "India", "pathogen": "E.coli", "resistance": "AMR"},
         {"id": "S2", "organism": "Salmonella", "country": "UK", "pathogen": "Salmonella", "resistance": "None"},

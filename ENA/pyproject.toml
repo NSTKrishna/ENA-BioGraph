@@ -8,4 +8,5 @@ dependencies = [
     "langchain>=1.2.13",
     "langchain-community>=0.4.1",
     "langchain-ollama>=1.0.1",
+    "sqlite-utils>=3.39",
 ]

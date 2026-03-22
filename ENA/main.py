@@ -1,7 +1,9 @@
 from langchain_ollama import ChatOllama
 
-def Ollama_agent():
+def Ollama_agent(user_input):
     llm = ChatOllama(model="gemma3:1b")
+
+    SCHEMA = """ Graph Schema:Nodes:- Sample(id, organism, country)- Pathogen(name, resistance)Edges:- Sample -> PathogenAllowed operations:- MATCH- RETURNExample:MATCH (s:Sample)-[:HAS_PATHOGEN]->(p:Pathogen)WHERE p.resistance = "AMR"RETURN s.id, p.name"""
 
     prompt = f""" Generate a GQL query. Schema: {SCHEMA} Question: {user_input} Output ONLY query."""
 
@@ -45,7 +47,7 @@ def main():
         if user_input.lower() == "exit":
             break
 
-        gql = Ollama_agent()
+        gql = Ollama_agent(user_input)
         print("\nGenerated GQL:")
         print(gql)
 

@@ -1,3 +1,5 @@
 langchain
 langchain_community
 langchain-ollama
+psycopg2-binary==2.9.9
+sqlite-utils

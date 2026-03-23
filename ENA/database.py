@@ -1,34 +1,49 @@
-import sqlite3
+from sqlalchemy import create_engine, inspect, text
+import pandas as pd
 import random
+import string
 
-conn = sqlite3.connect("ena.db")
-cursor = conn.cursor()
+def generate_random_data(n=1000):
+    data = []
+    for i in range(n):
+        data.append({
+            "id": i + 1,
+            "name": ''.join(random.choices(string.ascii_letters, k=8)),
+            "value": random.randint(1, 1000)
+        })
+    return pd.DataFrame(data)
 
-cursor.execute(""" 
-    CREATE TABLE IF NOT EXISTS samples (
-        id TEXT, 
-        organism TEXT, 
-        country TEXT, 
-        resistance TEXT 
-    ) 
-""")
+def setup_db():
+    engine = create_engine("postgresql+psycopg2://postgres:postgres123@localhost:5432/ena_db")
 
-organisms = ['E.coli', 'Salmonella', 'K.pneumoniae', 'S.aureus', 'P.aeruginosa']
-countries = ['India', 'UK', 'USA', 'Germany', 'Japan', 'Brazil', 'South Africa']
-resistances = ['AMR', 'None', 'MDR', 'XDR']
+    try:
+        inspector = inspect(engine)
 
-data_to_insert = []
-for i in range(1, 101):
-    row = (
-        f"S{i}", 
-        random.choice(organisms), 
-        random.choice(countries), 
-        random.choice(resistances)
-    )
-    data_to_insert.append(row)
+        # ✅ Check if table exists
+        if "samples" in inspector.get_table_names():
+            with engine.connect() as conn:
+                result = conn.execute(text("SELECT COUNT(*) FROM samples"))
+                count = result.scalar()
 
-cursor.executemany("INSERT INTO samples VALUES (?, ?, ?, ?)", data_to_insert)
+                if count > 0:
+                    print(f"⚡ Table already seeded with {count} rows. Skipping.")
+                    return
 
-conn.commit()
-print(f"Successfully inserted {len(data_to_insert)} rows into ena.db")
-conn.close()
+        # ✅ If table doesn't exist OR is empty → seed it
+        df = generate_random_data(1000)
+        print("Generated data:", df.shape)
+
+        df.to_sql(
+            "samples",
+            engine,
+            if_exists="append",   # safe for production
+            index=False
+        )
+
+        print("✅ Seeded PostgreSQL with 1000 rows!")
+
+    except Exception as e:
+        print(f"Error: {e}")
+
+if __name__ == "__main__":
+    setup_db()

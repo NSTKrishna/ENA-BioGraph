@@ -5,7 +5,7 @@ An AI-powered Graph Query Agent that translates natural language questions into 
 This project uses **PuppyGraph** to seamlessly map relational data stored in **PostgreSQL** into a Graph Graph, and leverages an open-source LLM (**gemma3:1b** via **Ollama**) to enable intuitive, conversational queries.
 
 ## Architecture
-![Architecture](./../image/Architecture.png)
+![Architecture](./image/Architecture.png)
 
 - **Database Layer:** PostgreSQL stores the core biological sample data, partitioned into dedicated tables (`samples`, `organisms`, `countries`, `resistances`) to ensure unique node mapping.
 - **Graph Layer:** PuppyGraph acts as a Zero-ETL graph engine, querying the PostgreSQL data natively as a graph using Apache TinkerPop (Gremlin).

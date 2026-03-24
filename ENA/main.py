@@ -26,8 +26,7 @@ Graph Schema:
 
 Rules:
 - ONLY output Gremlin
-- valueMap() MUST ALWAYS be the LAST step
-- NEVER place valueMap() before where()
+- Strictly follow this valueMap() MUST ALWAYS be the LAST step
 - ALWAYS start with g.V()
 - ALWAYS use hasLabel('sample') (lowercase)
 - NEVER use has('country',...) directly on sample
@@ -39,8 +38,6 @@ Rules:
 - NEVER explain
 
 Examples:
-
-g.V().hasLabel('sample').valueMap()
 
 g.V().hasLabel('sample')
   .where(out('HAS_COUNTRY').has('country', 'India'))
@@ -123,7 +120,8 @@ def main():
 
         result = run(graph, gremlin)
 
-        print("📊 Result:", result)
+        for r in result:
+            print(f"[{r['id']}] {r['organism']} | {r['country']} | {r['resistance']} | {r['sample']}")
 
 
 if __name__ == "__main__":

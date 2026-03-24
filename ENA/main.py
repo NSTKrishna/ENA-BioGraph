@@ -1,65 +1,129 @@
 from langchain_ollama import ChatOllama
+from gremlin_python.driver import client, serializer
+import re
 
-def Ollama_agent(user_input):
-    llm = ChatOllama(model="gemma3:1b")
+llm = ChatOllama(model="gemma3:1b", temperature=0)
 
-    SCHEMA = """ Graph Schema:Nodes:- Sample(id, organism, country)- Pathogen(name, resistance)Edges:- Sample -> PathogenAllowed operations:- MATCH- RETURNExample:MATCH (s:Sample)-[:HAS_PATHOGEN]->(p:Pathogen)WHERE p.resistance = "AMR"RETURN s.id, p.name"""
 
-    prompt = f""" Generate a GQL query. Schema: {SCHEMA} Question: {user_input} Output ONLY query."""
+def connect():
+    return client.Client(
+        "ws://localhost:8182/gremlin",
+        "g",
+        message_serializer=serializer.GraphSONSerializersV3d0()
+    )
 
-    return llm.invoke(prompt).content
 
-def validate_query(query: str) -> bool:
-    allowed_keywords = ["MATCH", "RETURN"]
-    
-    if not all(k in query for k in allowed_keywords):
-        return False
+# ---------------- STRICT PROMPT ----------------
 
-    if "DROP" in query or "DELETE" in query:
-        return False
-    
-    return True
+def generate_query(question):
+    prompt = f"""
+You are a STRICT Gremlin generator.
 
-def execute_gql(query: str):
-    
-    mock_db = [
-        {"id": "S1", "organism": "E.coli", "country": "India", "pathogen": "E.coli", "resistance": "AMR"},
-        {"id": "S2", "organism": "Salmonella", "country": "UK", "pathogen": "Salmonella", "resistance": "None"},
-    ]
-    if "AMR" in query:
-        return [row for row in mock_db if row["resistance"] == "AMR"]
+Graph Schema:
+(sample)-[:HAS_COUNTRY]->(country)
+(sample)-[:HAS_ORGANISM]->(organism)
+(sample)-[:HAS_RESISTANCE]->(resistance)
 
-    return mock_db
+Rules:
+- ONLY output Gremlin
+- valueMap() MUST ALWAYS be the LAST step
+- NEVER place valueMap() before where()
+- ALWAYS start with g.V()
+- ALWAYS use hasLabel('sample') (lowercase)
+- NEVER use has('country',...) directly on sample
+- ALWAYS traverse edges using out()
+- Allowed filters:
+    country → out('HAS_COUNTRY').has('country', VALUE)
+    organism → out('HAS_ORGANISM').has('organism', VALUE)
+    resistance → out('HAS_RESISTANCE').has('resistance', VALUE)
+- NEVER explain
 
-def format_answer(result):
-    if not result:
-        return "No data found."
+Examples:
 
-    return "\n".join([str(r) for r in result])
+g.V().hasLabel('sample').valueMap()
 
+g.V().hasLabel('sample')
+  .where(out('HAS_COUNTRY').has('country', 'India'))
+
+g.V().hasLabel('sample')
+  .where(out('HAS_COUNTRY').has('country', 'India'))
+  .where(out('HAS_ORGANISM').has('organism', 'Salmonella'))
+  .where(out('HAS_RESISTANCE').has('resistance', 'AMR'))
+  .valueMap()
+
+User: {question}
+"""
+    return llm.invoke(prompt).content.strip()
+
+
+# ---------------- SAFETY ----------------
+
+def clean_query(text):
+    text = re.sub(r'```.*?\n', '', text, flags=re.DOTALL).strip()
+
+    if "g.V()" in text:
+        return text[text.index("g.V()"):].strip()
+
+    return None
+
+def fallback(q):
+    q = q.lower()
+
+    query = "g.V().hasLabel('sample')"
+
+    filters = []
+
+    if "india" in q:
+        filters.append("out('HAS_COUNTRY').has('country','India')")
+
+    if "salmonella" in q:
+        filters.append("out('HAS_ORGANISM').has('organism','Salmonella')")
+
+    if "amr" in q:
+        filters.append("out('HAS_RESISTANCE').has('resistance','AMR')")
+
+    if filters:
+        query += ".and(" + ", ".join(filters) + ")"
+
+    return query + ".valueMap()"
+
+
+def validate(q):
+    return (
+        q.startswith("g.V()")
+        and "drop" not in q.lower()
+        and "hasLabel('sample')" in q
+    )
+
+
+# ---------------- EXECUTION ----------------
+
+def run(graph, query):
+    return graph.submit(query).all().result()
+
+
+# ---------------- MAIN ----------------
 
 def main():
-    print("🔬 ENA Graph Agent (type 'exit' to quit)\n")
+    graph = connect()
 
     while True:
-        user_input = input("Ask: ")
+        q = input("Ask: ")
 
-        if user_input.lower() == "exit":
+        if q.lower() == "exit":
             break
+        raw = generate_query(q)
+        gremlin = clean_query(raw) or fallback(q)
 
-        gql = Ollama_agent(user_input)
-        print("\nGenerated GQL:")
-        print(gql)
-
-        if not validate_query(gql):
-            print("Invalid query")
+        if not validate(gremlin):
+            print("❌ Invalid query")
             continue
 
-        result = execute_gql(gql)
-        
-        answer = format_answer(result)
-        print("\nAnswer:")
-        print(answer)
+        print("🔍", gremlin)
+
+        result = run(graph, gremlin)
+
+        print("📊 Result:", result)
 
 
 if __name__ == "__main__":

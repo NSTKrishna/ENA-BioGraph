@@ -1,4 +1,4 @@
-# ENA-BioGraph 🔬
+# ENA-BioGraph 
 
 An AI-powered Graph Query Agent that translates natural language questions into Gremlin graph queries to analyze Antimicrobial Resistance (AMR) sample data.
 
